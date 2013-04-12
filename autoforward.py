@@ -30,8 +30,10 @@ with the new recipient address)
 """
 
 import asyncore
+import email.header
 import email.utils
 from email.mime.text import MIMEText
+from email.parser import FeedParser
 from optparse import OptionParser
 import os.path
 import smtpd
@@ -53,7 +55,22 @@ class CustomSMTPServer(smtpd.SMTPServer):
         if self._timer:
             self._timer = None
             pass
-        msg = MIMEText(data, 'rfc2822')
+
+        parser = FeedParser()
+        parser.feed(data)
+        old_msg = parser.close()
+        new_text_lst = []
+        decoded_title = email.header.decode_header(old_msg['Subject'])[0][0]
+        decoded_from = email.header.decode_header(old_msg['From'])[0][0]
+        decoded_to = email.header.decode_header(old_msg['To'])[0][0]
+        new_text_lst.append('Message:')
+        new_text_lst.append(old_msg.get_payload(decode=True))
+        new_text_lst.append('')
+        new_text_lst.append('----Original data is as follows----')
+        new_text_lst.append(str(data))
+        new_text = '\n'.join(new_text_lst)
+
+        msg = MIMEText(new_text)
         msg['To'] = email.utils.formataddr(('Auto Forward', to_addr))
         msg['From'] = email.utils.formataddr(('Auto Forward', from_addr))
 
