@@ -63,11 +63,25 @@ class CustomSMTPServer(smtpd.SMTPServer):
         decoded_title = email.header.decode_header(old_msg['Subject'])[0][0]
         decoded_from = email.header.decode_header(old_msg['From'])[0][0]
         decoded_to = email.header.decode_header(old_msg['To'])[0][0]
-        new_text_lst.append('Message:')
-        new_text_lst.append(old_msg.get_payload(decode=True))
+        if (old_msg.is_multipart()):
+            new_text_lst.append('Multipart Message:')
+            for msg_part in old_msg.get_payload():
+                content_type = msg_part['Content-Type']
+                if (content_type.startswith('text')):
+                    new_text_lst.append('-- BEGIN CONTENT (%s)--' % content_type)
+                    new_text_lst.append(msg_part.get_payload(decode=True))
+                    new_text_lst.append('-- END CONTENT (%s)--' % content_type)
+                    pass
+                pass
+            pass
+        else:
+            new_text_lst.append('Message:')
+            new_text_lst.append(old_msg.get_payload(decode=True))
+            pass
         new_text_lst.append('')
         new_text_lst.append('----Original data is as follows----')
         new_text_lst.append(str(data))
+        print new_text_lst
         new_text = '\n'.join(new_text_lst)
 
         msg = MIMEText(new_text)
