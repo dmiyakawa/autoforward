@@ -30,17 +30,21 @@ with the new recipient address)
 """
 
 import asyncore
+import email.encoders
 import email.header
 import email.utils
 from email.mime.text import MIMEText
 from email.parser import FeedParser
 from optparse import OptionParser
 import os.path
+import re
 import smtpd
 import smtplib
 import sys
 import time
 from threading import Timer
+
+r_content_type = re.compile('(text/.+) *; *charset=(.+?) *$')
 
 class CustomSMTPServer(smtpd.SMTPServer):
     def __init__(self, localaddr, remoteaddr,
@@ -63,12 +67,25 @@ class CustomSMTPServer(smtpd.SMTPServer):
         decoded_title = email.header.decode_header(old_msg['Subject'])[0][0]
         decoded_from = email.header.decode_header(old_msg['From'])[0][0]
         decoded_to = email.header.decode_header(old_msg['To'])[0][0]
+        charset = None
         if (old_msg.is_multipart()):
             new_text_lst.append('Multipart Message:')
             for msg_part in old_msg.get_payload():
                 content_type = msg_part['Content-Type']
-                if (content_type.startswith('text')):
-                    new_text_lst.append('-- BEGIN CONTENT (%s)--' % content_type)
+                m = r_content_type.match(content_type)
+                if m:
+                    if charset:
+                        if charset != m.group(2):
+                            print 'charset mismatch (%s != %s)' % (charset,
+                                                                   m.group(2))
+                            pass
+                        pass
+                    else:
+                        charset = m.group(2)
+                        pass
+
+                    new_text_lst.append('-- BEGIN CONTENT (%s)--' %
+                                        content_type)
                     new_text_lst.append(msg_part.get_payload(decode=True))
                     new_text_lst.append('-- END CONTENT (%s)--' % content_type)
                     pass
@@ -85,11 +102,19 @@ class CustomSMTPServer(smtpd.SMTPServer):
         new_text = '\n'.join(new_text_lst)
 
         msg = MIMEText(new_text)
+        email.encoders.encode_quopri(msg)
         msg['To'] = email.utils.formataddr(('Auto Forward', to_addr))
         msg['From'] = email.utils.formataddr(('Auto Forward', from_addr))
 
         msg['Date'] = email.utils.formatdate(time.time(), True)
         msg['Subject'] = 'Automatically Forwarded Message'
+        if charset:
+            msg['Content-Type'] = 'text/plain; charset=%s' % charset
+        else:
+            msg['Content-Type'] = 'text/plain'
+            pass
+
+        print 'msg: %s' % msg.as_string()
 
         print 'Forwarding the message to %s' % self._smtp_server
         server = smtplib.SMTP(self._smtp_server)
