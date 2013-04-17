@@ -30,6 +30,7 @@ with the new recipient address)
 """
 
 import asyncore
+import codecs
 import email.encoders
 import email.header
 import email.utils
@@ -44,7 +45,7 @@ import sys
 import time
 from threading import Timer
 
-r_content_type = re.compile('(text/.+) *; *charset=(.+?) *$')
+r_content_type = re.compile('\s*(text/.+)\s*;\n?\s*charset=(.+?)\s*$')
 
 class CustomSMTPServer(smtpd.SMTPServer):
     def __init__(self, localaddr, remoteaddr,
@@ -63,6 +64,7 @@ class CustomSMTPServer(smtpd.SMTPServer):
         parser = FeedParser()
         parser.feed(data)
         old_msg = parser.close()
+
         new_text_lst = []
         decoded_title = email.header.decode_header(old_msg['Subject'])[0][0]
         decoded_from = email.header.decode_header(old_msg['From'])[0][0]
@@ -84,10 +86,12 @@ class CustomSMTPServer(smtpd.SMTPServer):
                         charset = m.group(2)
                         pass
 
+                    content_type_no_newline = ' '.join(content_type.split())
                     new_text_lst.append('-- BEGIN CONTENT (%s)--' %
-                                        content_type)
+                                        content_type_no_newline)
                     new_text_lst.append(msg_part.get_payload(decode=True))
-                    new_text_lst.append('-- END CONTENT (%s)--' % content_type)
+                    new_text_lst.append('-- END CONTENT (%s)--' %
+                                        content_type_no_newline)
                     pass
                 pass
             pass
@@ -98,21 +102,19 @@ class CustomSMTPServer(smtpd.SMTPServer):
         new_text_lst.append('')
         new_text_lst.append('----Original data is as follows----')
         new_text_lst.append(str(data))
-        print new_text_lst
+        
         new_text = '\n'.join(new_text_lst)
 
         msg = MIMEText(new_text)
-        email.encoders.encode_quopri(msg)
         msg['To'] = email.utils.formataddr(('Auto Forward', to_addr))
         msg['From'] = email.utils.formataddr(('Auto Forward', from_addr))
 
         msg['Date'] = email.utils.formatdate(time.time(), True)
         msg['Subject'] = 'Automatically Forwarded Message'
-        if charset:
-            msg['Content-Type'] = 'text/plain; charset=%s' % charset
-        else:
-            msg['Content-Type'] = 'text/plain'
-            pass
+        msg['Content-Type'] = 'text/plain'
+        msg.set_charset(charset)
+
+        # email.encoders.encode_quopri(msg)
 
         print 'msg: %s' % msg.as_string()
 
@@ -143,10 +145,9 @@ class CustomSMTPServer(smtpd.SMTPServer):
         print 'Receiving message from:', peer
         print 'Message addressed from:', mailfrom
         print 'Message addressed to  :', rcpttos
-        # print 'Message length        :', len(data)
-        print 'Message               :', data
-        print
-        print
+        print '----Original Message begins----'
+        print data
+        print '----Original Message ends----'
         self.send_forwarded_message(data, True)
         return
 
