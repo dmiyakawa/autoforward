@@ -171,7 +171,7 @@ if __name__ == '__main__':
                       help='FILE will be used for stderr destination')
     parser.add_option('-n', '--hostname', dest='hostname', metavar='HOST',
                       default='127.0.0.1',
-                      help='listen to ADDR for incoming message')
+                      help='listen to HOST for incoming message')
     parser.add_option('-p', '--port', dest='port', metavar='PORT',
                       default='25',
                       help='listen to PORT for incoming message')
@@ -195,7 +195,7 @@ if __name__ == '__main__':
 
     if (len(args) < 2):
         parser.error("insufficient argument(s)")
-        pass
+        sys.exit(1)
     
     smtp_server = args[0]
     to_addr = args[1]
