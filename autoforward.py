@@ -148,6 +148,8 @@ class CustomSMTPServer(smtpd.SMTPServer):
         print '----Original Message begins----'
         print data
         print '----Original Message ends----'
+        sys.stdout.flush()
+
         self.send_forwarded_message(data, True)
         return
 
@@ -189,6 +191,7 @@ if __name__ == '__main__':
     print '%s started at %s' % (os.path.basename(sys.argv[0]),
                                 email.utils.formatdate(time.time(), True))
     print 'options: %s' % str(options)
+    sys.stdout.flush()
 
     if (len(args) < 2):
         parser.error("insufficient argument(s)")
